@@ -2,11 +2,6 @@
 
 // examples of dumping info from OCR file
 
-$filename = 'part202055-mistral-common.json';
-$filename = 'biostor-192990_djvu-common.json';
-$filename = 'part80412-mistral-common.json';
-$filename = 'surveyeastpalae426maru_hocr-common.json';
-
 $filename = 'europeanjournal236muse-mistral-common.json';
 
 $json = file_get_contents($filename);
