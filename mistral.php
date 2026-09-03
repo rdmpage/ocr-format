@@ -116,8 +116,8 @@ switch ($mime_type)
 		break;
 }
 
-$doc->include_image_base64 = true;
-$doc->include_blocks = true;
+$doc->include_image_base64 = true; // Include image URLs in response
+$doc->include_blocks = true; // Return paragraph-level bounding boxes for all content blocks in the response
 
 $url = 'https://api.mistral.ai/v1/ocr';
 
