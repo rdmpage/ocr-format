@@ -109,9 +109,11 @@ function parse_djvu($filename)
 					
 					if (isset($w->firstChild->nodeValue))
 					{
-						$text = $w->firstChild->nodeValue;		
+						$text = $w->firstChild->nodeValue;	
 						
-						$len = strlen($text);
+						$text = mb_convert_encoding($text, "UTF-8", mb_detect_encoding($text));
+						
+						$len = mb_strlen($text);
 						$word->span = [$offset, $offset + $len];
 						$offset += $len + 1;
 																	

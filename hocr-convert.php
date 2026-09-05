@@ -197,9 +197,11 @@ function parse_hocr($filename)
 											
 						if (isset($ocrx_word->firstChild->nodeValue))
 						{
-							$text = $ocrx_word->firstChild->nodeValue;		
-							
-							$len = strlen($text);
+							$text = $ocrx_word->firstChild->nodeValue;	
+						
+							$text = mb_convert_encoding($text, "UTF-8", mb_detect_encoding($text));
+						
+							$len = mb_strlen($text);
 							$word->span = [$offset, $offset + $len];
 							$offset += $len + 1;
 																		

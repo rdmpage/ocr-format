@@ -4,7 +4,10 @@
 
 error_reporting(E_ALL);
 
-function type_mapper($type)
+require_once (dirname(__FILE__) . '/markdown.php');
+
+//----------------------------------------------------------------------------------------
+function mistral_type_mapper($type)
 {
 	switch ($type)
 	{
@@ -42,7 +45,8 @@ foreach ($obj->pages as $p)
 	$page->width  = $p->dimensions->width;
 	$page->height = $p->dimensions->height;
 	$page->source = $obj->model;
-	$page->text = "";
+	$page->text = ""; // we will create this as we traverse block structure
+	$page->markdown = $p->markdown; // keep structured Markdown that Mistral returns
 	$page->blocks = [];
 	
 	// helpers
@@ -52,8 +56,9 @@ foreach ($obj->pages as $p)
 	foreach ($p->blocks as $b)
 	{			
 		$block = new stdclass;
-		$block->type = type_mapper($b->type);
+		$block->type = mistral_type_mapper($b->type);
 		
+		// normalised coordinates of block
 		$block->bbox =
         [
             round($b->top_left_x      / $page->width, 4),
@@ -62,11 +67,21 @@ foreach ($obj->pages as $p)
             round($b->bottom_right_y  / $page->height, 4)
         ];		
 	
+		// text
 		if (isset($b->content))
 		{
-			$len = strlen($b->content);
+			$text = $b->content;
+			
+			$text = mb_convert_encoding($text, "UTF-8", mb_detect_encoding($text));
+			
+			// strip Markdown
+			$text = markdown_to_text($text);
+			// replace any extra end of lines
+			$text = preg_replace('/\R\R+/u', '\n', $text);
+						
+			$len = mb_strlen($text);
 			$block->span = [$offset, $offset + $len];
-			$text_blocks[] =  $b->content;			
+			$text_blocks[] = $text;			
 			$offset += $len + 1;
 		}
 		
