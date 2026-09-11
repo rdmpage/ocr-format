@@ -2,3 +2,5 @@ env.php
 .DS_Store
 
 /vendor/
+/examples/
+/plazi/
