@@ -7,16 +7,38 @@ require_once(dirname(__FILE__) . '/anno-map.php');
 // and map them onto the word coordinates in the common OCR JSON, so they can be shown as
 // highlights in a IIIF viewer.
 //
-// Usage: php anno.php [-html] > out.json
+// Usage: php anno.php [-html] [<common.json> [<page>]] > out.json
 //
 
-$filename = 'Amphibianreptil9A_djvu-common.json';
+$filename = dirname(__FILE__) . '/examples/Amphibianreptil9A_djvu-common.json';
 $page_number = 3;
 
-// The canvas these annotations will hang off
-$canvas = 'https://example.org/iiif/Amphibianreptil9A/canvas/p' . ($page_number + 1);
-
 $html_output = in_array('-html', $argv);
+
+$files = array_values(array_filter(array_slice($argv, 1), function($argument)
+{
+	return substr($argument, 0, 1) != '-';
+}));
+
+if (count($files) > 0)
+{
+	$filename = $files[0];
+}
+
+if (count($files) > 1)
+{
+	$page_number = (int)$files[1];
+}
+
+if (!file_exists($filename))
+{
+	fwrite(STDERR, "Can't read '" . $filename . "'\n");
+	exit(1);
+}
+
+// The canvas these annotations will hang off
+$canvas = 'https://example.org/iiif/' . basename($filename, '.json')
+	. '/canvas/p' . ($page_number + 1);
 
 $obj = json_decode(file_get_contents($filename));
 $page = $obj->pages[$page_number];

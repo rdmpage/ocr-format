@@ -18,8 +18,16 @@ Use `mb_substr` / `mb_strpos` when working with spans, or re-anchor using the an
 `anno-map.php` maps a character span onto page coordinates, and `anno.php` demonstrates it:
 
 ```
-php anno.php > page.json      # a IIIF AnnotationPage with xywh targets
+php anno.php > page.json         # a IIIF AnnotationPage with xywh targets
 php anno.php -html > page.html   # the same rectangles drawn over the page
+```
+
+It runs against `examples/Amphibianreptil9A_djvu-common.json` page 3 by default;
+name another common JSON and page to place the same annotations on a different
+OCR of the same page:
+
+```
+php anno.php examples/Amphibianreptil9A-mistral-common.json 3
 ```
 
 Two things it handles:
