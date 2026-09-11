@@ -213,7 +213,6 @@ function parse_hocr($filename)
 					
 					$text = join(' ', $words_text);
 				
-					$len = strlen($text);
 					$line->span = [$line_offset, $offset - 1];
 										
 					$page->blocks[] = $line;

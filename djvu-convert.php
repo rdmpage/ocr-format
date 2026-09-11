@@ -133,7 +133,6 @@ function parse_djvu($filename)
 				
 				$text = join(' ', $words_text);
 				
-				$len = strlen($text);
 				$line->span = [$line_offset, $offset - 1];
 						
 				// add line to list of blocks
