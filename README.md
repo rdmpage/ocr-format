@@ -36,3 +36,53 @@ Two things it handles:
 - **Line breaks.** `span_to_regions()` returns one rectangle per line rather than one bounding box for the whole span, so a name split over two lines (or two columns) highlights correctly. Words are grouped by the `line` block that contains them, falling back to clustering on vertical position when the page has no line blocks.
 
 Where a page has no `word` blocks — Mistral only gives paragraph level blocks — the highlight is as coarse as the blocks are. The useful move there is to anchor the annotation into a *word level* OCR of the same page and use those coordinates.
+
+## Placing strings on a page
+
+Sometimes all we know is that a string occurs on a page (e.g. a taxonomic name from BHL's name index, or a place name), with no offsets or context. `string-map.php` finds the string in the page text, and `strings.php` turns a list of them into annotations. The workflow is:
+
+1. get the OCR for a BHL item and convert it to common JSON;
+2. get a list of the strings on each page, from BHL or elsewhere;
+3. place them on the page with `strings.php`.
+
+The input is a TSV, `page<TAB>string[<TAB>source[<TAB>locator]]`:
+
+- `page` is the 0-based index into `pages` in the common JSON;
+- `source` is where the string comes from, typically a dataset DOI or other URI;
+- `locator` identifies the entry in that source, such as the URL or LSID of a taxonomic name, or a row fragment identifier (`#row=12`) for a CSV file.
+
+`source` and `locator` are copied to the output as they are. If a row has no source, the input file is the source (its file name) and the row's line number is the locator (`#row=n`, counting any header line, as RFC 7111 does for CSV). Output is a IIIF AnnotationPage by default:
+
+```
+php strings.php lepidopteraofcey01moor_hocr-common.json examples/lepidopteraofcey01moor-strings.tsv > strings.json
+```
+
+or, with `-tsv`, a table for loading into a database, one row per match:
+
+```
+php strings.php -tsv lepidopteraofcey01moor_hocr-common.json examples/lepidopteraofcey01moor-strings.tsv > strings.tsv
+```
+
+| column | |
+|---|---|
+| `page`, `string`, `source`, `locator` | from the input |
+| `width`, `height` | the page size in the OCR, to check against the image the IIIF canvas is built from |
+| `text` | what the OCR actually says |
+| `start`, `end` | character offsets of `text` in the page text (as for block spans) |
+| `prefix`, `suffix` | the text either side, 32 characters by default (`-context=n`) |
+| `xywh` | the region on the page, in the same pixels as `width` and `height`; a match that runs over a line break has one rectangle per line, separated by `;` |
+| `distance` | edit distance between `string` and `text`, 0 for an exact match |
+
+A string that isn't found still gets a row, with the match columns empty, so every input row is accounted for. Tabs, line breaks and backslashes in the text are written as `\t`, `\n`, `\r` and `\\`, which PostgreSQL's `COPY` and MySQL's `LOAD DATA` read by default. There is no canvas column: which canvas a page belongs to is decided when the rows are loaded. The JSON output, which is there for trying things out in IIIF viewers, does need canvases; they are made up unless you give a template, e.g. `-canvas='https://example.org/canvas/p{n}'`, where `{page}` is the 0-based page index and `{n}` the 1-based number. A summary of what was matched (and what wasn't) goes to STDERR.
+
+Matching is on tokens, ignoring case and punctuation, with the spaces squeezed out, trying windows one token shorter and longer than the string. So "ABARATHA" matches "Abaratha", and strings the OCR has split, hyphenated across a line, or run together are still found. If a string has exact matches on the page, all of them are used. If not, the closest matches within an edit distance of 30% of the string's length are used instead (so the running head "HESPERIUD4i" is found for "Hesperiidae"). These annotations have a second body recording what the OCR actually says. Where strings overlap, the one with more tokens wins, so "Xus" is only annotated where it isn't part of "Xus aus".
+
+To check the matches by eye, `-html` draws them over each page (exact matches in red, approximate ones in orange), and `-image` puts the page images underneath, using the same `{page}` and `{n}` placeholders:
+
+```
+php strings.php -html \
+  -image='https://iiif.archive.org/iiif/lepidopteraofcey01moor${page}/full/1000,/0/default.jpg' \
+  lepidopteraofcey01moor_hocr-common.json examples/lepidopteraofcey01moor-strings.tsv > strings.html
+```
+
+For Internet Archive items, use the IIIF image server as above, whose page numbers match the hOCR's; the `/page/n{N}` URLs can be out by one. The same preview is available for `anno.php` with `-html`.

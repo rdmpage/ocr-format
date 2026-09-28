@@ -484,4 +484,97 @@ function iiif_annotation($annotation, $canvas, $regions, $id = null, $split = fa
 	return [$make($id, $targets)];
 }
 
+//----------------------------------------------------------------------------------------
+// CSS position for a normalised [x0, y0, x1, y1] box
+function block_style($bbox)
+{
+	return 'left:' . round($bbox[0] * 100, 3) . '%;'
+		. 'top:' . round($bbox[1] * 100, 3) . '%;'
+		. 'width:' . round(($bbox[2] - $bbox[0]) * 100, 3) . '%;'
+		. 'height:' . round(($bbox[3] - $bbox[1]) * 100, 3) . '%;';
+}
+
+//----------------------------------------------------------------------------------------
+// Quick visual check: draw the matched rectangles over a page.
+//
+// $rows is a list of objects with ->value (what was annotated) and ->regions (from
+// span_to_regions()), and optionally ->text (what the OCR says) and ->distance (non-zero
+// for approximate matches, which are drawn in a different colour). If $image is given the
+// rectangles are drawn over the page image, otherwise over grey boxes for the words.
+function annotation_preview_page($page, $rows, $image = null, $heading = '')
+{
+	$html = '<div class="page">';
+
+	if ($heading != '')
+	{
+		$html .= '<h2>' . htmlspecialchars($heading) . '</h2>';
+	}
+
+	// The sheet has the page's shape, so the boxes are right even before an image loads
+	$html .= '<div class="sheet" style="aspect-ratio:' . (int)$page->width . '/' . (int)$page->height . '">';
+
+	if ($image)
+	{
+		$html .= '<img src="' . htmlspecialchars($image) . '" alt="">';
+	}
+	else
+	{
+		foreach ($page->blocks as $block)
+		{
+			if ($block->type == 'word')
+			{
+				$html .= '<div class="word" style="' . block_style($block->bbox) . '"></div>';
+			}
+		}
+	}
+
+	foreach ($rows as $row)
+	{
+		$class = (isset($row->distance) && $row->distance > 0) ? 'hit near' : 'hit';
+
+		foreach ($row->regions as $region)
+		{
+			$html .= '<div class="' . $class . '" title="' . htmlspecialchars($row->value . ' [' . $region->text . ']')
+				. '" style="' . block_style($region->bbox) . '"></div>';
+		}
+	}
+
+	$html .= '</div>';
+
+	// List what was matched, so near misses can be checked by eye
+	$html .= '<table><tr><th>Annotation</th><th>OCR</th><th>Distance</th><th>xywh</th></tr>';
+
+	foreach ($rows as $row)
+	{
+		$html .= '<tr' . ((isset($row->distance) && $row->distance > 0) ? ' class="near"' : '') . '>'
+			. '<td>' . htmlspecialchars($row->value) . '</td>'
+			. '<td>' . htmlspecialchars(isset($row->text) ? $row->text : '') . '</td>'
+			. '<td>' . (isset($row->distance) ? $row->distance : '') . '</td>'
+			. '<td>' . implode('<br>', array_map(function($region) { return $region->xywh; }, $row->regions)) . '</td>'
+			. '</tr>';
+	}
+
+	$html .= '</table></div>';
+
+	return $html;
+}
+
+//----------------------------------------------------------------------------------------
+// Wrap one or more pages from annotation_preview_page() in an HTML document
+function annotation_preview_html($pages)
+{
+	return '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Annotation preview</title><style>
+body { background:rgb(242,242,242); font-family:sans-serif; }
+.page { margin:1em auto; max-width:1000px; }
+.sheet { position:relative; background:white; border:1px solid rgb(192,192,192); }
+.sheet img { display:block; width:100%; height:100%; }
+.word { position:absolute; background:rgb(224,224,224); }
+.hit { position:absolute; background:rgba(255,0,0,0.25); outline:2px solid red; }
+.hit.near { background:rgba(255,140,0,0.25); outline-color:darkorange; }
+table { border-collapse:collapse; margin:0.5em 0 2em 0; font-size:0.9em; }
+th, td { text-align:left; padding:2px 8px; border-bottom:1px solid rgb(208,208,208); }
+tr.near td { color:darkorange; }
+</style></head><body>' . implode("\n", $pages) . '</body></html>';
+}
+
 ?>

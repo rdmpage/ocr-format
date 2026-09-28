@@ -206,7 +206,7 @@ foreach ($annotations as $index => $annotation)
 
 if ($html_output)
 {
-	echo annotation_preview_html($page, $debug);
+	echo annotation_preview_html([annotation_preview_page($page, $debug)]);
 }
 else
 {
@@ -219,51 +219,6 @@ else
 	$page_annotations->items = $output;
 
 	echo json_encode($page_annotations, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n";
-}
-
-//----------------------------------------------------------------------------------------
-// Quick visual check: draw the rectangles over a blank sheet the shape of the page
-function annotation_preview_html($page, $debug)
-{
-	$html = '<html><head><meta charset="utf-8"><style>
-body { background:rgb(242,242,242); font-family:sans-serif; }
-.page { position:relative; margin:1em auto; max-width:1000px; background:white; border:1px solid rgb(192,192,192); }
-.noimage { padding-top:' . round(((int)$page->height / (int)$page->width) * 100, 3) . '%; }
-.word { position:absolute; background:rgb(224,224,224); }
-.hit { position:absolute; background:rgba(255,0,0,0.35); outline:1px solid red; }
-</style></head><body><div class="page"><div class="noimage"></div>';
-
-	foreach ($page->blocks as $block)
-	{
-		if ($block->type != 'word')
-		{
-			continue;
-		}
-
-		$html .= '<div class="word" style="' . block_style($block->bbox) . '"></div>';
-	}
-
-	foreach ($debug as $row)
-	{
-		foreach ($row->regions as $region)
-		{
-			$html .= '<div class="hit" title="' . htmlspecialchars($row->value . ' [' . $region->text . ']')
-				. '" style="' . block_style($region->bbox) . '"></div>';
-		}
-	}
-
-	$html .= '</div></body></html>';
-
-	return $html;
-}
-
-//----------------------------------------------------------------------------------------
-function block_style($bbox)
-{
-	return 'left:' . round($bbox[0] * 100, 3) . '%;'
-		. 'top:' . round($bbox[1] * 100, 3) . '%;'
-		. 'width:' . round(($bbox[2] - $bbox[0]) * 100, 3) . '%;'
-		. 'height:' . round(($bbox[3] - $bbox[1]) * 100, 3) . '%;';
 }
 
 ?>
