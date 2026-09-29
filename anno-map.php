@@ -421,29 +421,21 @@ function span_to_regions($page, $start, $end, $padding = 0.0)
 }
 
 //----------------------------------------------------------------------------------------
-// Build a W3C/IIIF annotation whose target is the list of rectangles for this annotation.
+// Build IIIF annotations for the rectangles of this annotation, for adding to a manifest.
 //
-// Multiple rectangles are expressed as an array of targets, one per line, which is what
-// IIIF viewers such as Mirador understand. Set $split to get one annotation per rectangle
-// instead (safer with fussier viewers).
-function iiif_annotation($annotation, $canvas, $regions, $id = null, $split = false)
+// Each target is the canvas URI with an xywh fragment ("canvas#xywh=x,y,w,h"), not a
+// SpecificResource with a FragmentSelector. Both are valid, but viewers such as Tify only
+// understand the plain URI. For the same reason a span that covers several lines gives
+// one annotation per rectangle (with /0, /1, ... appended to the id), because Tify
+// ignores an array of targets. Set $split to false to get a single annotation with an
+// array of targets instead.
+function iiif_annotation($annotation, $canvas, $regions, $id = null, $split = true)
 {
 	$targets = [];
 
-	foreach ($regions as $index => $region)
+	foreach ($regions as $region)
 	{
-		$target = new stdclass;
-		$target->type = 'SpecificResource';
-		$target->source = $canvas;
-
-		$selector = new stdclass;
-		$selector->type = 'FragmentSelector';
-		$selector->conformsTo = 'http://www.w3.org/TR/media-frags/';
-		$selector->value = 'xywh=' . $region->xywh;
-
-		$target->selector = $selector;
-
-		$targets[] = $target;
+		$targets[] = $canvas . '#xywh=' . $region->xywh;
 	}
 
 	if (count($targets) == 0)
@@ -469,7 +461,7 @@ function iiif_annotation($annotation, $canvas, $regions, $id = null, $split = fa
 		return $output;
 	};
 
-	if ($split)
+	if ($split && count($targets) > 1)
 	{
 		$output = [];
 
@@ -498,7 +490,7 @@ function block_style($bbox)
 // Quick visual check: draw the matched rectangles over a page.
 //
 // $rows is a list of objects with ->value (what was annotated) and ->regions (from
-// span_to_regions()), and optionally ->text (what the OCR says) and ->distance (non-zero
+// span_to_regions()), and optionally ->text (what the page text says) and ->distance (non-zero
 // for approximate matches, which are drawn in a different colour). If $image is given the
 // rectangles are drawn over the page image, otherwise over grey boxes for the words.
 function annotation_preview_page($page, $rows, $image = null, $heading = '')
@@ -542,7 +534,7 @@ function annotation_preview_page($page, $rows, $image = null, $heading = '')
 	$html .= '</div>';
 
 	// List what was matched, so near misses can be checked by eye
-	$html .= '<table><tr><th>Annotation</th><th>OCR</th><th>Distance</th><th>xywh</th></tr>';
+	$html .= '<table><tr><th>Annotation</th><th>Text</th><th>Distance</th><th>xywh</th></tr>';
 
 	foreach ($rows as $row)
 	{

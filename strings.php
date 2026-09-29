@@ -10,22 +10,25 @@ require_once(dirname(__FILE__) . '/string-map.php');
 // Usage: php strings.php [-tsv|-html] [-canvas=<url template>] [-image=<url template>]
 //                        [-context=<n>] <common.json> <strings.tsv> > out
 //
-// The input TSV has one string per line: page<TAB>string[<TAB>source[<TAB>locator]]
+// The input TSV has one string per line:
+// page<TAB>string[<TAB>source[<TAB>locator[<TAB>notes]]]
 //
 // - page is the index into "pages" in the common JSON (0-based)
 // - source is where we were told the string is on this page, typically a dataset DOI
 //   or other URI
 // - locator identifies the entry in that source, e.g. the URL or LSID of a taxonomic
 //   name, or a row fragment identifier (#row=n) for a CSV file
+// - notes is anything the source says about this bit of text
 //
-// source and locator are copied through to the output unchanged. If a row has no source,
+// source, locator and notes are copied through to the output unchanged. If a row has no source,
 // the input file itself is the source (its file name) and the row's line number in that
 // file is the locator (#row=n, counting a header line, as RFC 7111 does for CSV). Lines
 // starting with # and a header line (non-numeric page) are skipped.
 //
 // Output (JSON by default):
 //
-// -tsv    one row per match, for loading into a database. A string that wasn't found gets
+// -tsv    one row per match, for loading into a database. The first column is the file
+//         name of the common JSON, to say which volume the rows belong to. A string that wasn't found gets
 //         a row with the match columns empty, so every input row is accounted for. See
 //         tsv_escape() for how tabs and line breaks in the text are written. There is no
 //         canvas, that's decided when the rows are loaded, but the page's width and height
@@ -145,6 +148,7 @@ foreach (file($strings_filename, FILE_IGNORE_NEW_LINES) as $line_index => $line)
 	$input->value = trim($row[1]);
 	$input->source = isset($row[2]) ? trim($row[2]) : '';
 	$input->locator = isset($row[3]) ? trim($row[3]) : '';
+	$input->notes = isset($row[4]) ? trim($row[4]) : '';
 
 	// No source given, so the source is this file and the locator is this row
 	if ($input->source == '')
@@ -165,7 +169,7 @@ $previews = [];
 
 if ($format == 'tsv')
 {
-	echo implode("\t", ['page', 'string', 'source', 'locator', 'width', 'height', 'text', 'start', 'end',
+	echo implode("\t", ['volume', 'page', 'string', 'source', 'locator', 'width', 'height', 'text', 'notes', 'start', 'end',
 		'prefix', 'suffix', 'xywh', 'distance']) . "\n";
 }
 
@@ -206,13 +210,13 @@ foreach ($pages as $page_number => $inputs)
 
 		$annotation->body = $body;
 
-		// If the OCR doesn't say exactly this, record what it does say
+		// If the page text doesn't say exactly this, record what it does say
 		if ($match->distance > 0)
 		{
 			$ocr = new stdclass;
 			$ocr->type = 'TextualBody';
 			$ocr->purpose = 'describing';
-			$ocr->value = 'OCR: ' . $match->text;
+			$ocr->value = 'Page text: ' . $match->text;
 
 			$annotation->body = [$body, $ocr];
 		}
@@ -252,21 +256,26 @@ foreach ($pages as $page_number => $inputs)
 			continue;
 		}
 
-		$input_columns = [$input->page, $input->value, $input->source, $input->locator, (int)$page->width, (int)$page->height];
+		$input_columns = [basename($filename), $input->page, $input->value, $input->source, $input->locator, (int)$page->width, (int)$page->height];
 
 		if (!isset($found[$input->value]))
 		{
-			echo implode("\t", array_map('tsv_escape', array_merge($input_columns, ['', '', '', '', '', '', '']))) . "\n";
+			echo implode("\t", array_map('tsv_escape', array_merge($input_columns, ['', $input->notes, '', '', '', '', '', '']))) . "\n";
 			continue;
 		}
 
 		foreach ($found[$input->value] as $match)
 		{
-			// A match that runs over a line break has one rectangle per line
-			$xywh = implode(';', array_map(function($region) { return $region->xywh; }, $match->regions));
+			// A JSON array of [x, y, w, h], usually just one, but a match that runs over a
+			// line break has one rectangle per line
+			$xywh = json_encode(array_map(function($region)
+			{
+				return array_map('intval', explode(',', $region->xywh));
+			}, $match->regions));
 
 			echo implode("\t", array_map('tsv_escape', array_merge($input_columns, [
 				$match->text,
+				$input->notes,
 				$match->start,
 				$match->end,
 				$match->prefix,

@@ -132,7 +132,7 @@ function find_string($tokens, $value, $max_ratio = 0.3)
 // Longer strings (more tokens) win over shorter ones, then closer matches over worse ones,
 // so "Xus" inside "Xus aus" is dropped, as are duplicate hits on the same text from the
 // different window sizes. Returns non-overlapping matches in page order, each with ->text
-// set to what the OCR actually says.
+// set to what the page text actually says.
 function find_strings($page, $values, $max_ratio = 0.3)
 {
 	$tokens = text_tokens($page->text);

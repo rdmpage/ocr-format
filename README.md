@@ -45,13 +45,14 @@ Sometimes all we know is that a string occurs on a page (e.g. a taxonomic name f
 2. get a list of the strings on each page, from BHL or elsewhere;
 3. place them on the page with `strings.php`.
 
-The input is a TSV, `page<TAB>string[<TAB>source[<TAB>locator]]`:
+The input is a TSV, `page<TAB>string[<TAB>source[<TAB>locator[<TAB>notes]]]`:
 
 - `page` is the 0-based index into `pages` in the common JSON;
 - `source` is where the string comes from, typically a dataset DOI or other URI;
-- `locator` identifies the entry in that source, such as the URL or LSID of a taxonomic name, or a row fragment identifier (`#row=12`) for a CSV file.
+- `locator` identifies the entry in that source, such as the URL or LSID of a taxonomic name, or a row fragment identifier (`#row=12`) for a CSV file;
+- `notes` is anything the source says about this bit of text.
 
-`source` and `locator` are copied to the output as they are. If a row has no source, the input file is the source (its file name) and the row's line number is the locator (`#row=n`, counting any header line, as RFC 7111 does for CSV). Output is a IIIF AnnotationPage by default:
+`source`, `locator` and `notes` are copied to the output as they are. If a row has no source, the input file is the source (its file name) and the row's line number is the locator (`#row=n`, counting any header line, as RFC 7111 does for CSV). Output is a IIIF AnnotationPage by default, for pasting into a manifest. Each annotation's target is the canvas URI with an xywh fragment (`canvas#xywh=x,y,w,h`), which viewers such as Tify need (they don't read a `SpecificResource` with a `FragmentSelector`), and a match that runs over a line break becomes one annotation per line:
 
 ```
 php strings.php lepidopteraofcey01moor_hocr-common.json examples/lepidopteraofcey01moor-strings.tsv > strings.json
@@ -65,17 +66,19 @@ php strings.php -tsv lepidopteraofcey01moor_hocr-common.json examples/lepidopter
 
 | column | |
 |---|---|
+| `volume` | the file name of the common JSON, to say which volume the rows belong to |
 | `page`, `string`, `source`, `locator` | from the input |
 | `width`, `height` | the page size in the OCR, to check against the image the IIIF canvas is built from |
-| `text` | what the OCR actually says |
+| `text` | what the page text actually says (OCR, or text from a born-digital PDF) |
+| `notes` | from the input |
 | `start`, `end` | character offsets of `text` in the page text (as for block spans) |
 | `prefix`, `suffix` | the text either side, 32 characters by default (`-context=n`) |
-| `xywh` | the region on the page, in the same pixels as `width` and `height`; a match that runs over a line break has one rectangle per line, separated by `;` |
+| `xywh` | the region on the page as a JSON array of `[x, y, w, h]` arrays, in the same pixels as `width` and `height`. There is usually one rectangle, but a match that runs over a line break has one per line, e.g. `[[1474,257,180,28],[102,301,95,28]]` |
 | `distance` | edit distance between `string` and `text`, 0 for an exact match |
 
 A string that isn't found still gets a row, with the match columns empty, so every input row is accounted for. Tabs, line breaks and backslashes in the text are written as `\t`, `\n`, `\r` and `\\`, which PostgreSQL's `COPY` and MySQL's `LOAD DATA` read by default. There is no canvas column: which canvas a page belongs to is decided when the rows are loaded. The JSON output, which is there for trying things out in IIIF viewers, does need canvases; they are made up unless you give a template, e.g. `-canvas='https://example.org/canvas/p{n}'`, where `{page}` is the 0-based page index and `{n}` the 1-based number. A summary of what was matched (and what wasn't) goes to STDERR.
 
-Matching is on tokens, ignoring case and punctuation, with the spaces squeezed out, trying windows one token shorter and longer than the string. So "ABARATHA" matches "Abaratha", and strings the OCR has split, hyphenated across a line, or run together are still found. If a string has exact matches on the page, all of them are used. If not, the closest matches within an edit distance of 30% of the string's length are used instead (so the running head "HESPERIUD4i" is found for "Hesperiidae"). These annotations have a second body recording what the OCR actually says. Where strings overlap, the one with more tokens wins, so "Xus" is only annotated where it isn't part of "Xus aus".
+Matching is on tokens, ignoring case and punctuation, with the spaces squeezed out, trying windows one token shorter and longer than the string. So "ABARATHA" matches "Abaratha", and strings the OCR has split, hyphenated across a line, or run together are still found. If a string has exact matches on the page, all of them are used. If not, the closest matches within an edit distance of 30% of the string's length are used instead (so the running head "HESPERIUD4i" is found for "Hesperiidae"). These annotations have a second body recording what the page text actually says. Where strings overlap, the one with more tokens wins, so "Xus" is only annotated where it isn't part of "Xus aus".
 
 To check the matches by eye, `-html` draws them over each page (exact matches in red, approximate ones in orange), and `-image` puts the page images underneath, using the same `{page}` and `{n}` placeholders:
 
