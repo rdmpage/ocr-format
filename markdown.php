@@ -97,6 +97,10 @@ function markdown_to_text($markdown)
 {
     $parsedown = new Parsedown();
 
+    // Treat any raw HTML in the Markdown as literal text, so that strings such as
+    // SICI-style DOIs (e.g. 254<0001:NWPSAP>2.0.CO;2) are not parsed as tags and lost
+    $parsedown->setMarkupEscaped(true);
+
     $html = $parsedown->text($markdown);
 
     $dom = new DOMDocument();
